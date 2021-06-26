@@ -1,0 +1,31 @@
+version: '3'
+
+services:
+    sdk:
+        build:
+            context: .
+            dockerfile: ./docker/sdk/Dockerfile
+        volumes:
+            - ./bin:/src/picorgb/bin
+        working_dir: /src/picorgb
+        command: cp picorgb.uf2 /src/picorgb/bin
+    # test:
+    #     build: ./docker/repl
+    #     privileged: true
+    #     devices: 
+    #         - '/dev/ttyS3:/dev/ttyS3'
+    #     # entrypoint: '/bin/sh'
+    #     # command: '/bin/sh'
+    # repl:
+    #     build: ./docker/repl
+    #     devices: 
+    #         - '/dev/ttyS3:/dev/ttyUSB0'
+    #     command: [ "-o", "-D", "/dev/ttyUSB0" ]
+    # micropython:
+    #     image: mitchins/micropython-linux:stable
+    #     working_dir: /src
+    #     environment:
+    #         MICROPYPATH: ./lib
+    #     volumes:
+    #         - ./src:/src
+    #     command: micropython main.py
