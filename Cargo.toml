@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "lib_rgb",
+    # "pico_rgb",
+    "workbench",
+    ]
+default-members = ["workbench"]

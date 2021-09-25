@@ -6,9 +6,9 @@ services:
             context: .
             dockerfile: ./docker/sdk/Dockerfile
         volumes:
-            - ./bin:/src/picorgb/bin
-        working_dir: /src/picorgb
-        command: cp picorgb.uf2 /src/picorgb/bin
+            - ./bin:/build/src/Image/bin
+        working_dir: /build/src/Image
+        command: cp PicoRGB_Image.uf2 ./bin/
     # test:
     #     build: ./docker/repl
     #     privileged: true

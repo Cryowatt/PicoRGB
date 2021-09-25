@@ -1,7 +1,10 @@
-cmake_minimum_required(VERSION 3.10)
+# CMakeList.txt : CMake project for CMakeProject1, include source and define
+# project specific logic here.
+#
+cmake_minimum_required (VERSION 3.8)
 
-# set the project name
-project(RGBWorkbench)
+# Add source to this project's executable.
+add_executable (RGBWorkbench "Workbench.cpp" "Workbench.hpp")
+target_link_libraries (RGBWorkbench LINK_PUBLIC PicoRGB)
 
-# add the executable
-add_executable(RGBWorkbench workbench.cpp)
+# TODO: Add tests and install targets if needed.

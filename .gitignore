@@ -8,3 +8,6 @@ obj/
 bin/
 out/
 
+/.vscode
+target/
+/OldCrap
