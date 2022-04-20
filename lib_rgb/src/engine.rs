@@ -1,4 +1,4 @@
-use std::{usize};
+use std::usize;
 
 // pub trait Renderer {
 
@@ -17,7 +17,30 @@ pub struct Colour {
 }
 
 impl Colour {
-    pub const BLACK:Colour = Colour{r:0,g:0, b:0};
+    pub const BLACK: Colour = Colour { r: 0, g: 0, b: 0 };
+    pub const WHITE: Colour = Colour {
+        r: 255,
+        g: 255,
+        b: 255,
+    };
+    pub const RED: Colour = Colour { r: 255, g: 0, b: 0 };
+    pub const YELLOW: Colour = Colour {
+        r: 255,
+        g: 255,
+        b: 0,
+    };
+    pub const GREEN: Colour = Colour { r: 0, g: 255, b: 0 };
+    pub const CYAN: Colour = Colour {
+        r: 0,
+        g: 255,
+        b: 255,
+    };
+    pub const BLUE: Colour = Colour { r: 0, g: 0, b: 255 };
+    pub const MAGENTA: Colour = Colour {
+        r: 255,
+        g: 0,
+        b: 255,
+    };
 }
 
 // impl Display for Colour {
@@ -44,13 +67,19 @@ impl Colour {
 // }
 
 pub struct Channel {
-    pub buffer: Box<[Colour]>
+    pub buffer: Box<[Colour]>,
 }
 
 impl Channel {
-        fn new(length: usize) -> Self {
-            Channel { buffer: vec![Colour::BLACK; length].into_boxed_slice()}
-        } // where Self: Sized;
+    fn new(length: usize) -> Self {
+        Channel {
+            buffer: vec![Colour::MAGENTA; length].into_boxed_slice(),
+        }
+    } // where Self: Sized;
+
+    fn resize(&mut self, length: usize) {
+        self.buffer = vec![Colour::RED; length].into_boxed_slice();
+    }
 }
 
 // pub struct ColourBuffer<const LENGTH: usize> {
@@ -61,7 +90,7 @@ impl Channel {
 //     pub data: Box<[Colour]>,
 // }
 
-// impl ColourBuffer {    
+// impl ColourBuffer {
 //     fn new(length: usize) -> Self {
 //         ColourBuffer {
 //             data: Vec::<Colour>::with_capacity(length).as_slice(),
@@ -87,36 +116,22 @@ pub trait Renderable {
     fn render(&self);
 }
 
+const CHANNELS: usize = 8;
+
 pub struct Engine {
-    // renderer: Box<dyn Renderer>,
-    pub renderer: fn(&Box<Channel>),
-    pub channels: [Box<Channel>; 8],
-    pub render_fps: u8,
+    renderer: fn(&Channel),
+    channels: [Channel; 8],
+    render_fps: u8,
 }
 
 impl Engine {
-    pub fn new(channel_lengths: [u8; 8], renderer: fn(&Box<Channel>)) -> Self {
-        // let mut channels = [Channel; 8];
+    pub fn resize_channel(&mut self, channel_id: usize, length: usize) {
+        self.channels[channel_id].resize(length);
+    }
 
-        // for i in 0..8 {
-        //     channels[i] = Channel::new(channelLengths[i].into());
-        // }
-        // for length in channelLengths {
-        //     channels[]
-        // }
-        // let c = Channel::new(8);
-        let channels = [
-            Box::new(Channel::new(channel_lengths[0].into())),
-            Box::new(Channel::new(channel_lengths[1].into())),
-            Box::new(Channel::new(channel_lengths[2].into())),
-            Box::new(Channel::new(channel_lengths[3].into())),
-            Box::new(Channel::new(channel_lengths[4].into())),
-            Box::new(Channel::new(channel_lengths[5].into())),
-            Box::new(Channel::new(channel_lengths[6].into())),
-            Box::new(Channel::new(channel_lengths[7].into())),
-        ];
+    pub fn new(channel_lengths: [usize; CHANNELS], renderer: fn(&Channel)) -> Self {
         Engine {
-            channels,
+            channels: channel_lengths.map(Channel::new),
             render_fps: 10,
             renderer,
         }
@@ -125,7 +140,7 @@ impl Engine {
 
 impl Renderable for Engine {
     fn render(&self) {
-        for i  in 0..self.channels.len() {
+        for i in 0..self.channels.len() {
             (self.renderer)(&self.channels[i]);
         }
     }
