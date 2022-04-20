@@ -1,3 +1,4 @@
+use console::Term;
 use lib_rgb::*;
 use ansi_term::Colour::RGB;
 
@@ -10,7 +11,9 @@ fn channelRender(channel: &Channel) {
     println!();
 }
 
-fn main() {
+fn main()  {    
+    let term = Term::stdout();
+    term.hide_cursor().unwrap();
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
 
@@ -22,8 +25,12 @@ fn main() {
     engine.resize_channel(3, 13);
 
     while running.load(Ordering::SeqCst) {
+        engine.update();
         engine.render();
+        term.move_cursor_up(8).unwrap();
     }
+
+    term.clear_screen().unwrap();
 }
 
 

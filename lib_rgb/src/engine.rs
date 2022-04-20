@@ -136,6 +136,16 @@ impl Engine {
             renderer,
         }
     }
+
+    pub fn update(&mut self) {
+        let i = 1;
+        for colour in self.channels[0].buffer.iter_mut() {
+            colour.b = colour.b.wrapping_add(i);
+            let i = i + 1;
+        }
+        // let buffer = &self.channels[0].buffer(0);
+        // buffer. += 1;
+    }
 }
 
 impl Renderable for Engine {
