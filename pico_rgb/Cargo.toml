@@ -5,11 +5,6 @@ readme = "README.md"
 name = "pico_rgb"
 version = "0.1.0"
 resolver = "2"
-default-run = "workbench"
-
-[[bin]]
-name = "workbench"
-path = "src/workbench.rs"
 
 [dependencies]
 cortex-m = "0.7.3"
@@ -23,6 +18,7 @@ panic-probe = { version = "0.3.0", features = ["print-defmt"] }
 
 # We're using a Pico by default on this template
 rp-pico = "0.3.0"
+lib_rgb = { path = "../lib_rgb" }
 
 # but you can use any BSP. Uncomment this to use the pro_micro_rp2040 BSP instead
 # sparkfun-pro-micro-rp2040 = "0.2.0"

@@ -1,3 +1,4 @@
+#![no_std]
 mod engine;
 pub use engine::Engine;
 pub use engine::Channel;

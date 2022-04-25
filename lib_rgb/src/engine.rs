@@ -1,14 +1,21 @@
-use std::{rc::Rc, sync::Arc, usize};
+#![no_std]
+extern crate alloc;
+//type float = f32;
+
+use alloc::{rc::Rc, boxed::Box, vec};
+use fixed::{FixedI16, types::{extra::U8, I16F16}, traits::ToFixed};
+// use fixed::traits::Fixed;
+// use std::{rc::Rc, sync::Arc, usize};
 
 pub trait Shader {
-    fn apply(&mut self, channel: &mut [Colour], delta: f32);
+    fn apply(&mut self, channel: &mut [Colour], delta_ms: i32);
 }
 
 #[derive(Clone, Copy, Default)]
 pub struct NoOpShader();
 
 impl Shader for NoOpShader {
-    fn apply(&mut self, channel: &mut [Colour], _delta: f32) {
+    fn apply(&mut self, channel: &mut [Colour], _delta_ms: i32) {
         let mut i = 0;
         // TODO: Not quite a no-op now is it?
         for colour in channel.iter_mut() {
@@ -23,45 +30,91 @@ impl Shader for NoOpShader {
 }
 
 pub trait Gradient {
-    fn get(&self, position: f32) -> Colour;
+    fn get(&self, position: i32) -> Colour;
 }
 
 pub struct UnicornVomit {}
 
-impl Gradient for UnicornVomit {
-    fn get(&self, position: f32) -> Colour {
-        // ⁅256(2|2(𝑥+1/2−floor((𝑥+1/2)+1/2))|−2/3)⁆
-        // let r = 256 * (2*(2*(position+0.5f)-(position+0.5f))+0.5f)).floor())).abs()-(2/3));
+// impl Gradient for UnicornVomit2 {
+//     fn get(&self, position: i32) -> Colour {
+//         // const AMPLITUDE: float =  float::from_num(765);
+//         let max_byte: I16F16 =  I16F16::from_num(255);
+//         // const DOUBLE: float = float::from_num(2);
+//         let half: I16F16 = I16F16::from_num(0.5);
         
-        let r = (765.0f32*(2.0f32*(position - 0.5f32 - position.floor())).abs()-255.0f32).clamp(0.0f32, 255.0f32) as u8;
-        let position = position + (2.0/3.0);
-        let g = (765.0f32*(2.0f32*(position - 0.5f32 - position.floor())).abs()-255.0f32).clamp(0.0f32, 255.0f32) as u8;
-        let position = position + (2.0/3.0);
-        let b = (765.0f32*(2.0f32*(position - 0.5f32 - position.floor())).abs()-255.0f32).clamp(0.0f32, 255.0f32) as u8;
-        Colour { r, g, b }
-        // let g = 2 * (2*(position-0.5-(position).floor())).abs() - (2/3);
-        // let b = 2 * (2*(position-0.5-(position).floor())).abs() - (2/3);
+//         // let r = (765 * (2 * (position - HALF - position.floor())).abs() - MAX_BYTE).clamp(float::ZERO, MAX_BYTE);
+//         let r = ((position - half - position.floor()).saturating_mul_int(2).abs().saturating_mul_int(765) - max_byte).clamp(I16F16::ZERO, max_byte);
+//         let position = position + I16F16::from_num (2.0 / 3.0);
+//         let g = ((position - half - position.floor()).saturating_mul_int(2).abs().saturating_mul_int(765) - max_byte).clamp(I16F16::ZERO, max_byte);
+//         let position = position + I16F16::from_num (2.0 / 3.0);
+//         let b = ((position - half - position.floor()).saturating_mul_int(2).abs().saturating_mul_int(765) - max_byte).clamp(I16F16::ZERO, max_byte);
+        
+//         // let position = position + (2.0 / 3.0);
+//         // let g = (AMPLITUDE * UnicornVomit::abs(2.0f32 * (position - 0.5f32 - UnicornVomit::floor(position))) - MAX_BYTE).clamp(0.0f32, MAX_BYTE) as u8;
+//         // let position = position + (2.0 / 3.0);
+//         // let b = (AMPLITUDE * UnicornVomit::abs(2.0f32 * (position - 0.5f32 - UnicornVomit::floor(position))) - MAX_BYTE).clamp(0.0f32, MAX_BYTE) as u8;
+//         //Colour { r, g, b }
+//         Colour { r:r.to_num::<u8>(), g: g.to_num::<u8>(), b: b.to_num::<u8>() }
+//     }
+// }
+
+impl Gradient for UnicornVomit {
+    fn get(&self, position: i32) -> Colour {
+        let c = 255;
+        let x = ((position % 511)-255).abs();
+        match (position / 256) % 6 {
+            0 => Colour {r:c, g:0, b:x as u8}, // M -> R
+            1 => Colour {r:c, g:x as u8, b:0}, // R -> Y
+            2 => Colour {r:x as u8, g:c, b:0}, // Y -> G
+            3 => Colour {r:0, g:c, b:x as u8}, // G -> C
+            4 => Colour {r:0, g:x as u8, b:c}, // C -> B
+            _ => Colour {r:x as u8, g:0, b:c}, // B -> M
+        }
+        // // let c = 1.0;
+        // // let x = ;
+        // // const AMPLITUDE: float =  float::from_num(765);
+        // let max_byte: I16F16 =  I16F16::from_num(255);
+        // // const DOUBLE: float = float::from_num(2);
+        // let half: I16F16 = I16F16::from_num(0.5);
+        
+        // // let r = (765 * (2 * (position - HALF - position.floor())).abs() - MAX_BYTE).clamp(float::ZERO, MAX_BYTE);
+        // let r = ((position - half - position.floor()).saturating_mul_int(2).abs().saturating_mul_int(765) - max_byte).clamp(I16F16::ZERO, max_byte);
+        // let position = position + I16F16::from_num (2.0 / 3.0);
+        // let g = ((position - half - position.floor()).saturating_mul_int(2).abs().saturating_mul_int(765) - max_byte).clamp(I16F16::ZERO, max_byte);
+        // let position = position + I16F16::from_num (2.0 / 3.0);
+        // let b = ((position - half - position.floor()).saturating_mul_int(2).abs().saturating_mul_int(765) - max_byte).clamp(I16F16::ZERO, max_byte);
+        
+        // // let position = position + (2.0 / 3.0);
+        // // let g = (AMPLITUDE * UnicornVomit::abs(2.0f32 * (position - 0.5f32 - UnicornVomit::floor(position))) - MAX_BYTE).clamp(0.0f32, MAX_BYTE) as u8;
+        // // let position = position + (2.0 / 3.0);
+        // // let b = (AMPLITUDE * UnicornVomit::abs(2.0f32 * (position - 0.5f32 - UnicornVomit::floor(position))) - MAX_BYTE).clamp(0.0f32, MAX_BYTE) as u8;
+        // //Colour { r, g, b }
+        // Colour { r:r.to_num::<u8>(), g: g.to_num::<u8>(), b: b.to_num::<u8>() }
+        // Colour::RED
     }
 }
 
 pub struct ChaseShader {
-    chase: Arc<dyn Gradient>,
-    position: f32,
+    chase: Rc<dyn Gradient>,
+    position: i32,
 }
 
 impl ChaseShader {
-    pub fn new(gradient: Arc<dyn Gradient>) -> Self {
-        ChaseShader { chase: gradient, position: 0f32 }
+    pub fn new(gradient: Rc<dyn Gradient>) -> Self {
+        ChaseShader {
+            chase: gradient,
+            position: 0,
+        }
     }
 }
 
 impl Shader for ChaseShader {
-    fn apply(&mut self, channel: &mut [Colour], delta: f32) {
-        self.position = self.position + delta;
+    fn apply(&mut self, channel: &mut [Colour], delta_ms: i32) {
+        self.position += delta_ms;
+        let channel_length: i32 = channel.len().try_into().unwrap();
 
-        for i in 0..channel.len() {
-            let o = i as f32 / channel.len() as f32;
-            channel[i] = self.chase.get(self.position + o);
+        for i in 0..channel_length {
+            channel[i as usize] = self.chase.get(self.position + (i*5));
         }
     }
 }
@@ -99,7 +152,7 @@ impl Shader for ChaseShader {
 pub struct Channel {
     pub buffer: Box<[Colour]>,
     pub shader: Box<dyn Shader>,
-    position: f32,
+    position: i32,
 }
 
 static DEFAULT_SHADER: NoOpShader = NoOpShader();
@@ -109,7 +162,7 @@ impl Channel {
         Channel {
             buffer: vec![Colour::MAGENTA; length].into_boxed_slice(),
             shader: Box::new(DEFAULT_SHADER),
-            position: 0f32,
+            position: 0,
         }
     }
 
@@ -117,8 +170,8 @@ impl Channel {
         self.buffer = vec![Colour::RED; length].into_boxed_slice();
     }
 
-    fn update(&mut self, delta: f32) {
-        self.shader.apply(self.buffer.as_mut(), delta);
+    fn update(&mut self, delta_ms: i32) {
+        self.shader.apply(self.buffer.as_mut(), delta_ms);
     }
 }
 
@@ -145,9 +198,9 @@ impl<const CHANNEL_COUNT: usize> Engine<CHANNEL_COUNT> {
         }
     }
 
-    pub fn update(&mut self, delta: f32) {
+    pub fn update(&mut self, delta_ms: i32) {
         for channel in self.channels.iter_mut() {
-            channel.update(delta);
+            channel.update(delta_ms);
         }
     }
 
