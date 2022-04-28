@@ -6,6 +6,7 @@ use console::{Term, Color};
 use ansi_term::Colour::RGB;
 use fixed::types::I16F16;
 use lib_rgb::*;
+use lib_rgb::graphics::colour::Colour;
 use core::slice;
 use std::ops::Shl;
 use std::sync::atomic::{AtomicBool, Ordering};

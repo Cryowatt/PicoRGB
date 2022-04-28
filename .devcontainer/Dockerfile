@@ -11,6 +11,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 USER vscode
 RUN rustup target add thumbv6m-none-eabi
 RUN rustup toolchain install --target x86_64-unknown-linux-gnu thumbv6m-none-eabi -- nightly
+RUN rustup component add rustfmt --toolchain nightly
 RUN rustup component add clippy --toolchain nightly
 RUN cargo install cargo-watch flip-link elf2uf2-rs
 
