@@ -2,9 +2,9 @@ extern crate alloc;
 
 use alloc::rc::Rc;
 
-use crate::{Gradient, FixedTime};
+use crate::FixedTime;
 
-use super::Colour;
+use super::{Colour, gradient::Gradient};
 
 
 pub trait Shader {

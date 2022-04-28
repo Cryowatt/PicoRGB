@@ -8,6 +8,7 @@ use fixed::types::I16F16;
 use lib_rgb::*;
 use lib_rgb::graphics::ChaseShader;
 use lib_rgb::graphics::colour::Colour;
+use lib_rgb::graphics::gradient::UnicornVomit;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;

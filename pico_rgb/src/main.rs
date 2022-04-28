@@ -17,9 +17,9 @@ extern crate alloc;
 use fixed::types::I16F16;
 use alloc::boxed::Box;
 use alloc_cortex_m::CortexMHeap;
-use cortex_m::delay::Delay;
 use hal::Timer;
-use hal::gpio::{PushPull, Pin, Output, PinId, FunctionPio0};
+use hal::gpio::{Pin, FunctionPio0};
+use lib_rgb::graphics::gradient::UnicornVomit;
 use lib_rgb::graphics::{Colour, ChaseShader};
 use pio::{SideSet};
 use core::alloc::Layout;
@@ -50,7 +50,7 @@ use embedded_hal::timer::CountDown;
 // A shorter alias for the Peripheral Access Crate, which provides low-level
 // register access
 use rp_pico::hal::pac;
-use hal::pio::{PIOExt, Tx, StateMachineIndex, PIO, UninitStateMachine, StateMachine, Running, ShiftDirection, PinDir};
+use hal::pio::{PIOExt, Tx, StateMachineIndex, PIO, UninitStateMachine, ShiftDirection, PinDir};
 
 // A shorter alias for the Hardware Abstraction Layer, which provides
 // higher-level drivers.
@@ -93,7 +93,7 @@ impl<TPIO, TStateMachine> PicoRenderer<TPIO, TStateMachine>
         // Initialize and start PIO
         let installed = pio.install(&program).unwrap();
         let div = 16f32; //8f32 / 133f32; // as slow as possible (0 is interpreted as 65536)
-        let (mut sm, _, tx) = rp2040_hal::pio::PIOBuilder::from_program(installed)
+        let (mut _sm, _, tx) = rp2040_hal::pio::PIOBuilder::from_program(installed)
             .set_pins(pin_id, 1)
             .clock_divisor(div)
             .autopull(true)
@@ -102,8 +102,8 @@ impl<TPIO, TStateMachine> PicoRenderer<TPIO, TStateMachine>
             .out_shift_direction(ShiftDirection::Left)
             .build(state_machine);
 
-        sm.set_pindirs([(16, PinDir::Output)]);
-        let sm = sm.start();
+        _sm.set_pindirs([(16, PinDir::Output)]);
+        let _sm = _sm.start();
 
         PicoRenderer {
             // program,
@@ -215,7 +215,7 @@ fn main() -> ! {
 
     // Grab our singleton objects
     let mut pac: pac::Peripherals = pac::Peripherals::take().unwrap();
-    let core: pac::CorePeripherals = pac::CorePeripherals::take().unwrap();
+    let _core: pac::CorePeripherals = pac::CorePeripherals::take().unwrap();
 
     // Set up the watchdog driver - needed by the clock setup code
     let mut watchdog = hal::Watchdog::new(pac.WATCHDOG);
@@ -223,7 +223,7 @@ fn main() -> ! {
     // Configure the clocks
     //
     // The default is to generate a 125 MHz system clock
-    let clocks = hal::clocks::init_clocks_and_plls(
+    let _clocks = hal::clocks::init_clocks_and_plls(
         rp_pico::XOSC_CRYSTAL_FREQ,
         pac.XOSC,
         pac.CLOCKS,
@@ -256,7 +256,7 @@ fn main() -> ! {
     let _led: Pin<_, FunctionPio0> = pins.gpio16.into_mode();
     // let mut pico = PicoRgb::new(led_pin, delay);
 
-    let (mut pio0, sm0, sm1, sm2, sm3) = pac.PIO0.split(&mut pac.RESETS);
+    let (mut pio0, sm0, _sm1, _sm2, _sm3) = pac.PIO0.split(&mut pac.RESETS);
 
     let mut engine = Engine::new([9, 16, 16, 16, 16, 16, 16, 1]);
     let unicorn_vomit = alloc::rc::Rc::new(UnicornVomit{});
@@ -293,7 +293,7 @@ fn oom(_: Layout) -> ! {
 }
 
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
+fn panic(_info: &PanicInfo) -> ! {
     // println!("{}", info);
     loop {}
 }
