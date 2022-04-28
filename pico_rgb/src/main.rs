@@ -16,18 +16,13 @@ extern crate alloc;
 
 use fixed::types::I16F16;
 use alloc::boxed::Box;
-use alloc::vec::Vec;
 use alloc_cortex_m::CortexMHeap;
 use cortex_m::delay::Delay;
 use hal::Timer;
-use hal::clocks::SystemClock;
-// use embedded_hal::digital::v2::OutputPin;
-use hal::gpio::{PushPull, Pin, Output, PushPullOutput, PinId, FunctionPio0};
-use hal::gpio::bank0::Gpio25;
-use pio::{Program, SideSet};
-// use hal::pio;
+use hal::gpio::{PushPull, Pin, Output, PinId, FunctionPio0};
+use lib_rgb::graphics::{Colour, ChaseShader};
+use pio::{SideSet};
 use core::alloc::Layout;
-use core::iter::Inspect;
 use core::panic::PanicInfo;
 use lib_rgb::*;
 
@@ -44,16 +39,13 @@ use embedded_hal::digital::v2::OutputPin;
 // Time handling traits
 use embedded_time::duration::*;    // imports all duration-related types and traits
 use embedded_time::rate::*;        // imports all rate-related types and traits
-use embedded_time::clock;
 use embedded_hal::timer::CountDown;
-use embedded_time::duration::Extensions;
 
 // // Ensure we halt the program on panic (if we don't mention this crate it won't
 // // be linked)
 // use panic_halt as _;
 
 // Pull in any important traits
-use rp_pico::hal::prelude::*;
 
 // A shorter alias for the Peripheral Access Crate, which provides low-level
 // register access
@@ -64,15 +56,10 @@ use hal::pio::{PIOExt, Tx, StateMachineIndex, PIO, UninitStateMachine, StateMach
 // higher-level drivers.
 use rp_pico::hal;
 
-struct PicoRgb<TPinId> where TPinId: PinId {
-    led_pin: Pin<TPinId, Output<PushPull>>,
-    delay: Delay,
-}
-
 struct PicoRenderer<TPIO, TStateMachine>
     where TPIO: PIOExt, TStateMachine: StateMachineIndex {
     // program: Program<32>,
-    state_machine: StateMachine<(TPIO, TStateMachine), Running>,
+    // state_machine: StateMachine<(TPIO, TStateMachine), Running>,
     out_stream: Tx<(TPIO, TStateMachine)>,
 }
 
@@ -107,7 +94,7 @@ impl<TPIO, TStateMachine> PicoRenderer<TPIO, TStateMachine>
         let installed = pio.install(&program).unwrap();
         let div = 16f32; //8f32 / 133f32; // as slow as possible (0 is interpreted as 65536)
         let (mut sm, _, tx) = rp2040_hal::pio::PIOBuilder::from_program(installed)
-            .set_pins(16, 1)
+            .set_pins(pin_id, 1)
             .clock_divisor(div)
             .autopull(true)
             .pull_threshold(24)
@@ -120,7 +107,7 @@ impl<TPIO, TStateMachine> PicoRenderer<TPIO, TStateMachine>
 
         PicoRenderer {
             // program,
-            state_machine: sm,
+            // state_machine: sm,
             out_stream: tx,
         }
     }
@@ -207,32 +194,6 @@ impl <TPIO, TStateMachine> Renderer for PicoRenderer<TPIO, TStateMachine>
 }
 
 
-// struct PicoRgb;
-impl<TPinId> PicoRgb<TPinId> where TPinId: PinId {
-    pub fn new(led_pin: Pin<TPinId, Output<PushPull>>, delay: Delay) -> Self
-    {        
-        PicoRgb::<TPinId> {
-            led_pin,
-            delay,
-        }
-    }
-
-    // pub fn run(&mut self) -> ! {
-    
-    //     // The delay object lets us wait for specified amounts of time (in
-    //     // milliseconds)
-    //     // let mut delay = cortex_m::delay::Delay;
-        
-    //     // let channel_render = |channel: &Channel| {
-    //     //     led_pin.set_high().unwrap();
-    //     //     delay.delay_ms(100);
-    //     //     led_pin.set_low().unwrap();
-    //     //     delay.delay_ms(100);
-    //     // };
-    
-    //     // let fp: fn(&Channel) = channel_render.call;
-    // }
-}
 
 /// Entry point to our bare-metal application.
 ///

@@ -1,25 +1,14 @@
 extern crate alloc;
 //type float = f32;
 
-use alloc::{rc::Rc, boxed::Box, vec};
-use fixed::types::I16F16;
-use crate::graphics::colour::Colour;
+use alloc::{boxed::Box, vec};
+use crate::{graphics::{colour::Colour, shader::Shader, NoOpShader}, FixedTime};
 // use fixed::traits::Fixed;
 // use std::{rc::Rc, sync::Arc, usize};
 
-pub trait Shader {
-    fn apply(&mut self, channel: &mut [Colour], delta: I16F16);
-}
-
-#[derive(Clone, Copy, Default)]
-pub struct NoOpShader();
-
-impl Shader for NoOpShader {
-    fn apply(&mut self, _channel: &mut [Colour], _delta: I16F16) { }
-}
 
 pub trait Gradient {    
-    fn get(&self, position: I16F16 ) -> Colour;
+    fn get(&self, position: FixedTime ) -> Colour;
 }
 
 pub struct UnicornVomit {}
@@ -48,8 +37,8 @@ pub struct UnicornVomit {}
 // }
 
 impl Gradient for UnicornVomit {
-    fn get(&self, position: I16F16) -> Colour {
-        let half: I16F16 = I16F16::from_num(0.5);
+    fn get(&self, position: FixedTime) -> Colour {
+        let half: FixedTime = FixedTime::from_num(0.5);
         let x = 2*255*(3*position-(3*position+half).floor()).abs();
         let c = 255;
         // let x = ((position % 511)-255).abs();
@@ -85,31 +74,6 @@ impl Gradient for UnicornVomit {
     }
 }
 
-pub struct ChaseShader {
-    chase: Rc<dyn Gradient>,
-    position: I16F16,
-}
-
-impl ChaseShader {
-    pub fn new(gradient: Rc<dyn Gradient>) -> Self {
-        ChaseShader {
-            chase: gradient,
-            position: I16F16::ZERO,
-        }
-    }
-}
-
-impl Shader for ChaseShader {
-    fn apply(&mut self, channel: &mut [Colour], delta: I16F16) {
-        self.position += delta;        
-        let channel_length = I16F16::from_num(channel.len());
- 
-        for i in 0..channel.len() {
-            let degrees = I16F16::from_num(i) / channel_length;
-            channel[i as usize] = self.chase.get(self.position + degrees);
-        }
-    }
-}
 
 // class ChaseShader(Shader):
 //     def __init__(self, source: ColorBuffer, cycles_per_second: float):
@@ -145,7 +109,7 @@ pub struct Channel {
     pub buffer: Box<[Colour]>,
     pub shader: Box<dyn Shader>,
     pub renderer: Box<dyn Renderer>,
-    position: I16F16,
+    position: FixedTime,
 }
 
 static DEFAULT_SHADER: NoOpShader = NoOpShader();
@@ -155,7 +119,7 @@ impl Channel {
         Channel {
             buffer: vec![Colour::MAGENTA; length].into_boxed_slice(),
             shader: Box::new(DEFAULT_SHADER),
-            position: I16F16::ZERO,
+            position: FixedTime::ZERO,
             renderer: Box::new(NullRenderer()),
         }
     }
@@ -164,7 +128,7 @@ impl Channel {
         self.buffer = vec![Colour::RED; length].into_boxed_slice();
     }
 
-    fn update(&mut self, delta: I16F16) {
+    fn update(&mut self, delta: FixedTime) {
         self.position += delta;
         self.shader.apply(self.buffer.as_mut(), delta);
     }
@@ -214,7 +178,7 @@ impl<const CHANNEL_COUNT: usize> Engine<CHANNEL_COUNT> {
         }
     }
 
-    pub fn update(&mut self, delta: I16F16) {
+    pub fn update(&mut self, delta: FixedTime) {
         for channel in self.channels.iter_mut() {
             channel.update(delta);
         }

@@ -1,14 +1,13 @@
 #![feature(array_chunks)]
 extern crate alloc;
 
-use console::{Term, Color};
+use console::{Term};
 
 use ansi_term::Colour::RGB;
 use fixed::types::I16F16;
 use lib_rgb::*;
+use lib_rgb::graphics::ChaseShader;
 use lib_rgb::graphics::colour::Colour;
-use core::slice;
-use std::ops::Shl;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -23,10 +22,6 @@ impl Renderer for ConsoleRenderer {
     
         println!();
     }
-}
-
-unsafe fn to_pio_fifo(p: &[Colour; 4]) -> &[u32] {
-    core::slice::from_raw_parts(p.as_ptr() as *const u32, 4)
 }
 
 fn main() {
