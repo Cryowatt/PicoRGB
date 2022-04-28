@@ -15,7 +15,7 @@ mod tests {
     fn rainbow_test(position: f32, expected_colour: Colour) {
         let fp_poisiton = I16F16::from_num(position);
         let rainbow = lib_rgb::UnicornVomit {};
-        let red = rainbow.get((1000.0 * position) as i32);
+        let red = rainbow.get(I16F16::from_num(position));
         assert_eq!(red, expected_colour);
     }
 

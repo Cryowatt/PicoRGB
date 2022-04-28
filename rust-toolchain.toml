@@ -1,0 +1,3 @@
+[toolchain]
+channel = "nightly"
+targets = ["thumbv6m-none-eabi", "x86_64-unknown-linux-gnu"]

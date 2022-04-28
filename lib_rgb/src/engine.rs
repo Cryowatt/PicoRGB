@@ -1,36 +1,24 @@
-#![no_std]
 extern crate alloc;
 //type float = f32;
 
 use alloc::{rc::Rc, boxed::Box, vec};
-use fixed::{FixedI16, types::{extra::U8, I16F16}, traits::ToFixed};
+use fixed::types::I16F16;
 // use fixed::traits::Fixed;
 // use std::{rc::Rc, sync::Arc, usize};
 
 pub trait Shader {
-    fn apply(&mut self, channel: &mut [Colour], delta_ms: i32);
+    fn apply(&mut self, channel: &mut [Colour], delta: I16F16);
 }
 
 #[derive(Clone, Copy, Default)]
 pub struct NoOpShader();
 
 impl Shader for NoOpShader {
-    fn apply(&mut self, channel: &mut [Colour], _delta_ms: i32) {
-        let mut i = 0;
-        // TODO: Not quite a no-op now is it?
-        for colour in channel.iter_mut() {
-            colour.r = colour.r.wrapping_add(i);
-            i = i.wrapping_add(1);
-            colour.g = colour.g.wrapping_add(i);
-            i = i.wrapping_add(1);
-            colour.b = colour.b.wrapping_add(i);
-            i = i.wrapping_add(1);
-        }
-    }
+    fn apply(&mut self, _channel: &mut [Colour], _delta: I16F16) { }
 }
 
-pub trait Gradient {
-    fn get(&self, position: i32) -> Colour;
+pub trait Gradient {    
+    fn get(&self, position: I16F16 ) -> Colour;
 }
 
 pub struct UnicornVomit {}
@@ -59,16 +47,18 @@ pub struct UnicornVomit {}
 // }
 
 impl Gradient for UnicornVomit {
-    fn get(&self, position: i32) -> Colour {
+    fn get(&self, position: I16F16) -> Colour {
+        let half: I16F16 = I16F16::from_num(0.5);
+        let x = 2*255*(3*position-(3*position+half).floor()).abs();
         let c = 255;
-        let x = ((position % 511)-255).abs();
-        match (position / 256) % 6 {
-            0 => Colour {r:c, g:0, b:x as u8}, // M -> R
-            1 => Colour {r:c, g:x as u8, b:0}, // R -> Y
-            2 => Colour {r:x as u8, g:c, b:0}, // Y -> G
-            3 => Colour {r:0, g:c, b:x as u8}, // G -> C
-            4 => Colour {r:0, g:x as u8, b:c}, // C -> B
-            _ => Colour {r:x as u8, g:0, b:c}, // B -> M
+        // let x = ((position % 511)-255).abs();
+        match ((position * 6) % 6).int().to_num() {
+            0 => Colour {r:c, g:x.to_num(), b:0}, // R -> Y
+            1 => Colour {r:x.to_num(), g:c, b:0}, // Y -> G
+            2 => Colour {r:0, g:c, b:x.to_num()}, // G -> C
+            3 => Colour {r:0, g:x.to_num(), b:c}, // C -> B
+            4 => Colour {r:x.to_num(), g:0, b:c}, // B -> M
+            _ => Colour {r:c, g:0, b:x.to_num()}, // M -> R
         }
         // // let c = 1.0;
         // // let x = ;
@@ -96,25 +86,26 @@ impl Gradient for UnicornVomit {
 
 pub struct ChaseShader {
     chase: Rc<dyn Gradient>,
-    position: i32,
+    position: I16F16,
 }
 
 impl ChaseShader {
     pub fn new(gradient: Rc<dyn Gradient>) -> Self {
         ChaseShader {
             chase: gradient,
-            position: 0,
+            position: I16F16::ZERO,
         }
     }
 }
 
 impl Shader for ChaseShader {
-    fn apply(&mut self, channel: &mut [Colour], delta_ms: i32) {
-        self.position += delta_ms;
-        let channel_length: i32 = channel.len().try_into().unwrap();
-
-        for i in 0..channel_length {
-            channel[i as usize] = self.chase.get(self.position + (i*5));
+    fn apply(&mut self, channel: &mut [Colour], delta: I16F16) {
+        self.position += delta;        
+        let channel_length = I16F16::from_num(channel.len());
+ 
+        for i in 0..channel.len() {
+            let degrees = I16F16::from_num(i) / channel_length;
+            channel[i as usize] = self.chase.get(self.position + degrees);
         }
     }
 }
@@ -152,7 +143,8 @@ impl Shader for ChaseShader {
 pub struct Channel {
     pub buffer: Box<[Colour]>,
     pub shader: Box<dyn Shader>,
-    position: i32,
+    pub renderer: Box<dyn Renderer>,
+    position: I16F16,
 }
 
 static DEFAULT_SHADER: NoOpShader = NoOpShader();
@@ -162,7 +154,8 @@ impl Channel {
         Channel {
             buffer: vec![Colour::MAGENTA; length].into_boxed_slice(),
             shader: Box::new(DEFAULT_SHADER),
-            position: 0,
+            position: I16F16::ZERO,
+            renderer: Box::new(NullRenderer()),
         }
     }
 
@@ -170,15 +163,32 @@ impl Channel {
         self.buffer = vec![Colour::RED; length].into_boxed_slice();
     }
 
-    fn update(&mut self, delta_ms: i32) {
-        self.shader.apply(self.buffer.as_mut(), delta_ms);
+    fn update(&mut self, delta: I16F16) {
+        self.position += delta;
+        self.shader.apply(self.buffer.as_mut(), delta);
+    }
+
+    fn render(&mut self) {
+        let renderer = self.renderer.as_mut();
+        renderer.render(&self.buffer);
     }
 }
 
 pub struct Engine<const CHANNEL_COUNT: usize> {
-    renderer: fn(&Channel),
+    // renderfn: fn(&Channel),
     channels: [Channel; CHANNEL_COUNT],
-    render_fps: u8,
+    // renderer: Box<dyn Renderer>,
+    // render_fps: u8,
+}
+
+pub trait Renderer {
+    fn render(&mut self, channel: &[Colour]);
+}
+
+pub struct NullRenderer();
+
+impl Renderer for NullRenderer {
+    fn render(&mut self, _channel: &[Colour]) {}
 }
 
 impl<const CHANNEL_COUNT: usize> Engine<CHANNEL_COUNT> {
@@ -190,32 +200,38 @@ impl<const CHANNEL_COUNT: usize> Engine<CHANNEL_COUNT> {
         self.channels[channel_id].shader = shader;
     }
 
-    pub fn new(channel_lengths: [usize; CHANNEL_COUNT], renderer: fn(&Channel)) -> Self {
+    pub fn set_renderer(&mut self, channel_id: usize, renderer: Box<dyn Renderer>) {
+        self.channels[channel_id].renderer = renderer;
+    }
+
+//    pub fn new(channel_lengths: [usize; CHANNEL_COUNT], renderer: fn(&Channel)) -> Self {
+    pub fn new(channel_lengths: [usize; CHANNEL_COUNT]) -> Self {
         Engine {
             channels: channel_lengths.map(Channel::new),
-            render_fps: 10,
-            renderer,
+            // render_fps: 10,
+            // renderer,
         }
     }
 
-    pub fn update(&mut self, delta_ms: i32) {
+    pub fn update(&mut self, delta: I16F16) {
         for channel in self.channels.iter_mut() {
-            channel.update(delta_ms);
+            channel.update(delta);
         }
     }
 
     pub fn render(&mut self) {
         for channel in self.channels.iter_mut() {
-            (self.renderer)(channel);
+            channel.render();
         }
     }
 }
 
 #[derive(Clone, Copy, Default, Debug, PartialEq)]
+#[repr(C)]
 pub struct Colour {
+    pub b: u8,
     pub r: u8,
     pub g: u8,
-    pub b: u8,
 }
 
 impl Colour {

@@ -1,20 +1,31 @@
+#![feature(array_chunks)]
 extern crate alloc;
 
-use console::Term;
+use console::{Term, Color};
 
 use ansi_term::Colour::RGB;
+use fixed::types::I16F16;
 use lib_rgb::*;
+use core::slice;
+use std::ops::Shl;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-fn channel_render(channel: &Channel) {
-    for pixel in channel.buffer.iter() {
-        print!("{}", RGB(pixel.r, pixel.g, pixel.b).paint("■"));
+struct ConsoleRenderer {}
+impl Renderer for ConsoleRenderer {
+    fn render(&mut self, channel: &[Colour]) {
+        for pixel in channel.iter() {
+            print!("{}", RGB(pixel.r, pixel.g, pixel.b).paint("■"));
+        }
+    
+        println!();
     }
+}
 
-    println!();
+unsafe fn to_pio_fifo(p: &[Colour; 4]) -> &[u32] {
+    core::slice::from_raw_parts(p.as_ptr() as *const u32, 4)
 }
 
 fn main() {
@@ -29,8 +40,7 @@ fn main() {
     .expect("Error setting Ctrl-C handler");
 
     let unicorn_vomit = alloc::rc::Rc::new(UnicornVomit{});
-
-    let mut engine = Engine::new([2, 3, 5, 10, 20, 40, 80, 160], channel_render);
+    let mut engine = Engine::new([2, 3, 5, 10, 20, 40, 80, 160]);
     engine.set_shader(0, Box::new(ChaseShader::new(unicorn_vomit.clone())));
     engine.set_shader(1, Box::new(ChaseShader::new(unicorn_vomit.clone())));
     engine.set_shader(2, Box::new(ChaseShader::new(unicorn_vomit.clone())));
@@ -39,7 +49,16 @@ fn main() {
     engine.set_shader(5, Box::new(ChaseShader::new(unicorn_vomit.clone())));
     engine.set_shader(6, Box::new(ChaseShader::new(unicorn_vomit.clone())));
     engine.set_shader(7, Box::new(ChaseShader::new(unicorn_vomit)));
-    engine.update(0);
+
+    engine.set_renderer(0, Box::new(ConsoleRenderer{}));
+    engine.set_renderer(1, Box::new(ConsoleRenderer{}));
+    engine.set_renderer(2, Box::new(ConsoleRenderer{}));
+    engine.set_renderer(3, Box::new(ConsoleRenderer{}));
+    engine.set_renderer(4, Box::new(ConsoleRenderer{}));
+    engine.set_renderer(5, Box::new(ConsoleRenderer{}));
+    engine.set_renderer(6, Box::new(ConsoleRenderer{}));
+    engine.set_renderer(7, Box::new(ConsoleRenderer{}));
+    engine.update(I16F16::ZERO);
     engine.render();
     println!();
     const LOOP_TARGET: Duration = Duration::from_millis(10);
@@ -47,7 +66,8 @@ fn main() {
     while running.load(Ordering::SeqCst) {
         let now = Instant::now();
         term.move_cursor_up(9).unwrap();
-        engine.update(LOOP_TARGET.as_millis().try_into().unwrap());
+        //engine.update(LOOP_TARGET.as_millis().try_into().unwrap());
+        engine.update(I16F16::from_num(LOOP_TARGET.as_secs_f32()));
         engine.render();
 
         if now.elapsed() < LOOP_TARGET {
