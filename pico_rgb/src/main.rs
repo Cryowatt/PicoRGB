@@ -1,12 +1,3 @@
-//! # Pico Blinky Example
-//!
-//! Blinks the LED on a Pico board.
-//!
-//! This will blink an LED attached to GP25, which is the pin the Pico uses for
-//! the on-board LED.
-//!
-//! See the `Cargo.toml` file for Copyright and licence details.
-
 #![no_std]
 #![no_main]
 #![feature(alloc_error_handler)]
@@ -14,14 +5,17 @@
 
 extern crate alloc;
 
+mod renderer;
+use renderer::PicoRenderer;
+
+
 use fixed::types::I16F16;
 use alloc::boxed::Box;
 use alloc_cortex_m::CortexMHeap;
 use hal::Timer;
 use hal::gpio::{Pin, FunctionPio0};
 use lib_rgb::graphics::gradient::UnicornVomit;
-use lib_rgb::graphics::{Colour, ChaseShader};
-use pio::{SideSet};
+use lib_rgb::graphics::{ChaseShader};
 use core::alloc::Layout;
 use core::panic::PanicInfo;
 use lib_rgb::*;
@@ -50,149 +44,34 @@ use embedded_hal::timer::CountDown;
 // A shorter alias for the Peripheral Access Crate, which provides low-level
 // register access
 use rp_pico::hal::pac;
-use hal::pio::{PIOExt, Tx, StateMachineIndex, PIO, UninitStateMachine, ShiftDirection, PinDir};
+use hal::pio::{PIOExt};
 
 // A shorter alias for the Hardware Abstraction Layer, which provides
 // higher-level drivers.
 use rp_pico::hal;
 
-struct PicoRenderer<TPIO, TStateMachine>
-    where TPIO: PIOExt, TStateMachine: StateMachineIndex {
-    // program: Program<32>,
-    // state_machine: StateMachine<(TPIO, TStateMachine), Running>,
-    out_stream: Tx<(TPIO, TStateMachine)>,
-}
+/// USB SHIT
+// Pull in any important traits
+use embedded_time::fixed_point::FixedPoint;
+// use rp_pico::hal::prelude::*;
+// The macro for marking our interrupt functions
+use rp_pico::hal::pac::interrupt;
+// USB Device support
+use usb_device::{class_prelude::*, prelude::*};
 
-impl<TPIO, TStateMachine> PicoRenderer<TPIO, TStateMachine>
-    where TPIO: PIOExt, TStateMachine: StateMachineIndex {
-    fn new(pin_id: u8, pio: &mut PIO<TPIO>, state_machine: UninitStateMachine<(TPIO, TStateMachine)> ) -> Self
-    {
-        const T1: u8 = 2;
-        const T2: u8 = 5;
-        const T3: u8 = 3;
-        
-        let mut assembler = pio::Assembler::<32>::new_with_side_set(SideSet::new(false, 1, false));
-        let mut wrap_target = assembler.label();
-        let mut wrap_source = assembler.label();
-        let mut bit_loop = assembler.label();
-        let mut do_zero = assembler.label();
+// USB Human Interface Device (HID) Class support
+use usbd_hid::descriptor::generator_prelude::*;
+use usbd_hid::descriptor::MouseReport;
+use usbd_hid::hid_class::HIDClass;
 
-        assembler.bind(&mut wrap_target);
-        assembler.bind(&mut bit_loop);
-        assembler.out_with_delay_and_side_set(pio::OutDestination::X, 1, T3 -  1, 0);
-        assembler.jmp_with_delay_and_side_set(pio::JmpCondition::XIsZero, &mut do_zero, T1 - 1, 1);
-        assembler.jmp_with_delay_and_side_set(pio::JmpCondition::Always, &mut bit_loop, T2 - 1, 1);
-        assembler.bind(&mut do_zero);
-        assembler.nop_with_delay_and_side_set(T2 - 1, 0);
+/// The USB Device Driver (shared with the interrupt).
+static mut USB_DEVICE: Option<UsbDevice<hal::usb::UsbBus>> = None;
 
-        assembler.bind(&mut wrap_source);
-        let program = assembler.assemble_with_wrap(wrap_source, wrap_target);
-                
-        // TODO: Add uninstaller/deconstructor. Or maybe not, why destroy the renderer?
+/// The USB Bus Driver (shared with the interrupt).
+static mut USB_BUS: Option<UsbBusAllocator<hal::usb::UsbBus>> = None;
 
-        // Initialize and start PIO
-        let installed = pio.install(&program).unwrap();
-        let div = 16f32; //8f32 / 133f32; // as slow as possible (0 is interpreted as 65536)
-        let (mut _sm, _, tx) = rp2040_hal::pio::PIOBuilder::from_program(installed)
-            .set_pins(pin_id, 1)
-            .clock_divisor(div)
-            .autopull(true)
-            .pull_threshold(24)
-            .side_set_pin_base(16)
-            .out_shift_direction(ShiftDirection::Left)
-            .build(state_machine);
-
-        _sm.set_pindirs([(16, PinDir::Output)]);
-        let _sm = _sm.start();
-
-        PicoRenderer {
-            // program,
-            // state_machine: sm,
-            out_stream: tx,
-        }
-    }
-}
-
-union Pixel {
-    colour: Colour,
-    data: u32,
-}
-
-impl <TPIO, TStateMachine> Renderer for PicoRenderer<TPIO, TStateMachine>
-    where TPIO: PIOExt, TStateMachine: StateMachineIndex {
-    fn render(&mut self, channel: &[Colour]) { 
-        for c in channel {
-            unsafe {
-                while !self.out_stream.write(Pixel { colour: *c }.data << 8) {}
-            }
-        }
-        // let c = [Colour{g:1, r:2, b:3},Colour{g:4, r:5, b:6},Colour{g:7, r:8, b:9},Colour{g:10, r:11, b:12},Colour{g:13, r:14, b:15}];
-
-        // // let p = c.as_ptr();
-        // unsafe {
-        //     while !self.out_stream.write(Pixel { colour: c[0] }.data << 8) {}
-        //     while !self.out_stream.write(Pixel { colour: c[1] }.data << 8) {}
-        //     while !self.out_stream.write(Pixel { colour: c[2] }.data << 8) {}
-        //     // while !self.out_stream.write(*(p.offset(1) as *const u32)) {}
-        //     // while !self.out_stream.write(*(p.offset(2) as *const u32)) {}
-        // }
-        // for c in foo.chunks_exact(4) {
-            // let w0 = u32::from_ne_bytes([c[0].g, c[0].r, c[0].b, c[1].g]);
-            // let w1 = u32::from_ne_bytes([c[1].r, c[1].b, c[2].g, c[2].r]);
-            // let w2 = u32::from_ne_bytes([c[2].b, c[3].g, c[3].r, c[3].b]);
-            // // assert!(w0 == 0x01020304);
-            // // assert!(w1 == 0x05060708);
-            // // assert!(w2 == 0x090a0b0c);
-            // while !self.out_stream.write(w0) {}
-            // while !self.out_stream.write(w1) {}
-            // while !self.out_stream.write(w2) {}
-        // }
-        
-        // unsafe{
-        //     let cd = foo.as_ptr() as *const u32;
-        //     // let cd = core::slice::from_raw_parts(foo.as_ptr() as *const u32, foo.len());
-        //     for i in 0..(foo.len() * 3 / 4) as isize {            
-        //         self.out_stream.write((*cd.offset(i)).swap_bytes());
-        //     }
-        //     // let cd = core::slice::from_raw_parts(foo.as_ptr() as *const u32, foo.len());
-        //     // for p in cd {
-        //     //     self.out_stream.write((*p).swap_bytes());
-        //     // }
-        // }
-        // Chunk into 4 pixels to align 4*24bit into 3*32bit
-        // let iter = foo.array_chunks::<4>();
-        // for chunk in iter {
-        //     unsafe {
-        //         let data = to_pio_fifo(chunk);
-
-        //         for d in data {
-        //             self.out_stream.write((*d).swap_bytes());
-        //             //while !self.out_stream.write((*d).swap_bytes()) {}
-        //         }
-        //     }
-        // }
-
-        // self.out_stream.write(0x00FF_00FFu32);
-        // self.out_stream.write(0x0000_0000u32);
-        // self.out_stream.write(0xFF00_FFFFu32);
-        // for pixel_chunk in channel.chunks(4) {
-        //     unsafe {
-        //         let shit = pixel_chunk.align_to::<u32>();
-        //         while !self.out_stream.write(pixel_chunk.align_to::<u32>()) {}            
-        //     }
-        // }
-        // for pixel in channel.iter() {
-            //while !self.out_stream.write(pixel) {}
-            // while !self.out_stream.write(Colour::RED){}
-            // while !self.out_stream.write(Colour::YELLOW){}
-            // while !self.out_stream.write(Colour::GREEN){}
-            // while !self.out_stream.write(Colour::CYAN){}
-            // while !self.out_stream.write(Colour::BLUE){}
-            // while !self.out_stream.write(Colour::MAGENTA){}
-        // }
-    }
-}
-
+/// The USB Human Interface Device Driver (shared with the interrupt).
+static mut USB_HID: Option<HIDClass<hal::usb::UsbBus>> = None;
 
 
 /// Entry point to our bare-metal application.
@@ -215,6 +94,7 @@ fn main() -> ! {
 
     // Grab our singleton objects
     let mut pac: pac::Peripherals = pac::Peripherals::take().unwrap();
+    
     let _core: pac::CorePeripherals = pac::CorePeripherals::take().unwrap();
 
     // Set up the watchdog driver - needed by the clock setup code
@@ -223,7 +103,7 @@ fn main() -> ! {
     // Configure the clocks
     //
     // The default is to generate a 125 MHz system clock
-    let _clocks = hal::clocks::init_clocks_and_plls(
+    let clocks = hal::clocks::init_clocks_and_plls(
         rp_pico::XOSC_CRYSTAL_FREQ,
         pac.XOSC,
         pac.CLOCKS,
@@ -249,6 +129,54 @@ fn main() -> ! {
     let timer = Timer::new(pac.TIMER, &mut pac.RESETS);
     //let framerate = embedded_time::rate::Hertz::
     // let mut delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().integer());
+
+
+    // USB SHIT
+    // the USB driver
+    let usb_bus = UsbBusAllocator::new(hal::usb::UsbBus::new(
+        pac.USBCTRL_REGS,
+        pac.USBCTRL_DPRAM,
+        clocks.usb_clock,
+        true,
+        &mut pac.RESETS,
+    ));
+    unsafe {
+        // Note (safety): This is safe as interrupts haven't been started yet
+        USB_BUS = Some(usb_bus);
+    }
+
+    // Grab a reference to the USB Bus allocator. We are promising to the
+    // compiler not to take mutable access to this global variable whilst this
+    // reference exists!
+    let bus_ref = unsafe { USB_BUS.as_ref().unwrap() };
+
+    // Set up the USB HID Class Device driver, providing Mouse Reports
+    let usb_hid = HIDClass::new(bus_ref, MouseReport::desc(), 100);
+    unsafe {
+        // Note (safety): This is safe as interrupts haven't been started yet.
+        USB_HID = Some(usb_hid);
+    }
+
+    // Create a USB device with a fake VID and PID
+    let usb_dev = UsbDeviceBuilder::new(bus_ref, UsbVidPid(0x16c0, 0x27da))
+        .manufacturer("Fake company")
+        .product("Twitchy Mousey")
+        .serial_number("TEST")
+        .device_class(0xEF) // misc
+        .build();
+    unsafe {
+        // Note (safety): This is safe as interrupts haven't been started yet
+        USB_DEVICE = Some(usb_dev);
+    }
+
+    unsafe {
+        // Enable the USB interrupt
+        pac::NVIC::unmask(hal::pac::Interrupt::USBCTRL_IRQ);
+    };
+
+
+
+
     
     // Set the LED to be an output
     let mut led_pin = pins.gpio0.into_push_pull_output();
@@ -257,13 +185,12 @@ fn main() -> ! {
     // let mut pico = PicoRgb::new(led_pin, delay);
 
     let (mut pio0, sm0, _sm1, _sm2, _sm3) = pac.PIO0.split(&mut pac.RESETS);
-
     let mut engine = Engine::new([9, 16, 16, 16, 16, 16, 16, 1]);
     let unicorn_vomit = alloc::rc::Rc::new(UnicornVomit{});
     engine.set_shader(0, Box::new(ChaseShader::new(unicorn_vomit)));
     engine.set_renderer(0, Box::new(PicoRenderer::new(16, &mut pio0, sm0)));
     
-    let frame_rate: Milliseconds::<u32> = Hertz::<u32>(100).to_duration().unwrap();
+    let frame_rate: Milliseconds::<u32> = Hertz::<u32>(10).to_duration().unwrap();
     // let LOOP_TARGET = Milliseconds::<u32>(20);
     // let timer = Instant::<Clock>::new(0);
     let mut delay = timer.count_down();
@@ -275,16 +202,41 @@ fn main() -> ! {
         engine.render();
         led_pin.set_low().unwrap();        
         let _ = nb::block!(delay.wait());
+
         
-        // led_pin.set_high().unwrap();
-        // engine.update(33);
-        // engine.render();
-        // led_pin.set_low().unwrap();
-        // // let len = xs.len() as u32;
-        // delay.delay_ms(100);
-        // delay.delay_ms(900);
-        // // delay.delay_ms(100 * len);
+        let rep_up = MouseReport {
+            x: 0,
+            y: 0,
+            buttons: 0,
+            wheel: 0,
+            pan: 0,
+        };
+        push_mouse_movement(rep_up).ok().unwrap_or(0);
     }
+}
+
+/// Submit a new mouse movement report to the USB stack.
+///
+/// We do this with interrupts disabled, to avoid a race hazard with the USB IRQ.
+fn push_mouse_movement(report: MouseReport) -> Result<usize, usb_device::UsbError> {
+    cortex_m::interrupt::free(|_| unsafe {
+        // Now interrupts are disabled, grab the global variable and, if
+        // available, send it a HID report
+        USB_HID.as_mut().map(|hid| hid.push_input(&report))
+    })
+    .unwrap()
+}
+
+
+/// This function is called whenever the USB Hardware generates an Interrupt
+/// Request.
+#[allow(non_snake_case)]
+#[interrupt]
+unsafe fn USBCTRL_IRQ() {
+    // Handle USB request
+    let usb_dev = USB_DEVICE.as_mut().unwrap();
+    let usb_hid = USB_HID.as_mut().unwrap();
+    usb_dev.poll(&mut [usb_hid]);
 }
     
 #[alloc_error_handler]
