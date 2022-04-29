@@ -11,7 +11,7 @@ pub struct UnicornVomit {}
 impl Gradient for UnicornVomit {
     fn get(&self, position: FixedTime) -> Colour {
         let half: FixedTime = FixedTime::from_num(0.5);
-        let x = 2 * 255 * (3 * position - (3 * position + half).floor()).abs();
+        let x = 511 * (3 * position - (3 * position + half).floor()).abs();
         const C: u8 = 255;
 
         match ((position * 6) % 6).int().to_num() {
