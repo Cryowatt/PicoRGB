@@ -1,8 +1,8 @@
+#![no_std]
 #[cfg(test)]
 mod tests {
     use fixed::types::I16F16;
-    use lib_rgb::Colour;
-    use lib_rgb::Gradient;
+    use lib_rgb::graphics::{gradient::{UnicornVomit, Gradient}, Colour};
 
     #[test]
     fn it_works() {
@@ -13,8 +13,7 @@ mod tests {
     }
 
     fn rainbow_test(position: f32, expected_colour: Colour) {
-        let fp_poisiton = I16F16::from_num(position);
-        let rainbow = lib_rgb::UnicornVomit {};
+        let rainbow = UnicornVomit {};
         let red = rainbow.get(I16F16::from_num(position));
         assert_eq!(red, expected_colour);
     }
